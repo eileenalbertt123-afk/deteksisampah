@@ -9,7 +9,7 @@ st.set_page_config(page_title="Deteksi Sampah - Bank Sampah", layout="wide")
 
 st.title("Deteksi & Klasifikasi Sampah pada Tumpukan")
 st.write("Unggah foto, lalu sistem menandai tiap objek dan menghitung per kategori.")
-st.info("Mode demo: model belum terpasang, hasil masih acak.")
+
 
 col_in, col_out = st.columns(2)
 
