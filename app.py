@@ -1,38 +1,52 @@
-import gradio as gr
+import pandas as pd
+import streamlit as st
+from PIL import Image, ImageOps
+
 from detector import detect, CLASSES
 from utils import resize_max, draw_detections, count_per_class
 
-def run(image, conf):
-    if image is None:
-        raise gr.Error("Silakan unggah foto tumpukan sampah dulu.")
-    image = resize_max(image)
-    dets = detect(image, conf)
-    out_img = draw_detections(image, dets)
-    summary = count_per_class(dets, CLASSES)
-    detail = [[d["label"], d["confidence"], str(d["bbox"])] for d in dets]
-    return out_img, summary, detail
+st.set_page_config(page_title="Deteksi Sampah - Bank Sampah", layout="wide")
 
-with gr.Blocks(title="Deteksi Sampah - Bank Sampah") as demo:
-    gr.Markdown("# Deteksi & Klasifikasi Sampah pada Tumpukan\nUnggah foto, lalu sistem menandai tiap objek dan menghitung per kategori.\n\n*Mode demo: model belum terpasang, hasil masih acak.*")
-    with gr.Row():
-        with gr.Column():
-            inp = gr.Image(type="pil", label="Foto tumpukan sampah")
-            conf = gr.Slider(0.05, 0.95, value=0.25, step=0.05, label="Confidence threshold")
-            btn = gr.Button("Deteksi", variant="primary")
-        with gr.Column():
-            out = gr.Image(label="Hasil deteksi")
-            summary = gr.Dataframe(headers=["Kategori", "Jumlah"], label="Ringkasan")
-            detail = gr.Dataframe(headers=["Label", "Confidence", "BBox"], label="Detail")
-    with gr.Accordion("Keterbatasan sistem", open=False):
-        gr.Markdown(
-            "- Hanya 5 kategori: plastik, kertas/kardus, logam, organik, kaca\n"
-            "- Tumpukan sangat padat atau tertutup total tidak dijamin terdeteksi\n"
-            "- Tidak membedakan sub-jenis plastik (PET, HDPE, PP)\n"
-            "- Hanya berbasis citra, tanpa sensor berat atau material\n"
-            "- Performa terbaik pada foto terang, fokus, dan sudut wajar\n"
-            "- Prototipe, belum diuji langsung di bank sampah"
-            )
-    btn.click(run, [inp, conf], [out, summary, detail])
+st.title("Deteksi & Klasifikasi Sampah pada Tumpukan")
+st.write("Unggah foto, lalu sistem menandai tiap objek dan menghitung per kategori.")
+st.info("Mode demo: model belum terpasang, hasil masih acak.")
 
-if __name__ == "__main__":
-    demo.launch()
+col_in, col_out = st.columns(2)
+
+with col_in:
+    file = st.file_uploader("Foto tumpukan sampah", type=["jpg", "jpeg", "png"])
+    conf = st.slider("Confidence threshold", 0.05, 0.95, 0.25, 0.05)
+    run = st.button("Deteksi", type="primary")
+    if file is not None:
+        image = ImageOps.exif_transpose(Image.open(file)).convert("RGB")
+        st.image(image, caption="Foto asli", use_container_width=True)
+
+with col_out:
+    if run:
+        if file is None:
+            st.error("Silakan unggah foto tumpukan sampah dulu.")
+        else:
+            with st.spinner("Mendeteksi..."):
+                img = resize_max(image)
+                dets = detect(img, conf)
+                out_img = draw_detections(img, dets)
+                summary = count_per_class(dets, CLASSES)
+                detail = [[d["label"], d["confidence"], str(d["bbox"])] for d in dets]
+
+            st.image(out_img, caption="Hasil deteksi", use_container_width=True)
+            st.subheader("Ringkasan")
+            st.dataframe(pd.DataFrame(summary, columns=["Kategori", "Jumlah"]),
+                         hide_index=True, use_container_width=True)
+            st.subheader("Detail")
+            st.dataframe(pd.DataFrame(detail, columns=["Label", "Confidence", "BBox"]),
+                         hide_index=True, use_container_width=True)
+
+with st.expander("Keterbatasan sistem"):
+    st.markdown(
+        "- Hanya 5 kategori: plastik, kertas/kardus, logam, organik, kaca\n"
+        "- Tumpukan sangat padat atau tertutup total tidak dijamin terdeteksi\n"
+        "- Tidak membedakan sub-jenis plastik (PET, HDPE, PP)\n"
+        "- Hanya berbasis citra, tanpa sensor berat atau material\n"
+        "- Performa terbaik pada foto terang, fokus, dan sudut wajar\n"
+        "- Prototipe, belum diuji langsung di bank sampah"
+    )
